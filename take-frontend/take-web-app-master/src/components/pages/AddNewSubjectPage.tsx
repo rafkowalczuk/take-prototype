@@ -1,88 +1,73 @@
-import { FC, useEffect, useState } from 'react';
-import { TextInput } from '../forms/TextInput';
-import { BasicSelector } from '../forms/BasicSelector';
-import { jsSubmit } from '../../utils/js-submit';
-import { Lecturer } from '../../model/existing-objects/Lecturer';
-import { useRequest } from '../../hooks/useRequest.hook';
+import { FC, useEffect } from 'react';
+import { Card, Group, Text } from '@mantine/core';
+import { useNavigate } from 'react-router-dom';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { SubjectForm } from '../SubjectForm';
+import { useAddSubject } from '../../hooks/useAddSubject.hook';
+import { BasicRequestResult } from '../../types/BasicRequestResult';
+import { useAsyncEffect } from '../../hooks/useAsyncEffect.hook';
+import { sleep } from '../../utils/sleep';
+import { showNotification } from '../../utils/Notifications';
+import { SubjectSchemaType, SubjectValidationSchema } from '../../validation-schemas/subject';
 import { settings } from '../../settings';
 
 const AddNewSubjectPage: FC = () => {
-    const [name, setName] = useState<string>('');
-    const [lecturerId, setLecturerId] = useState<string | null>(null);
+  const { proceed: addSubject, result: addSubjectResult } = useAddSubject();
 
-    const { send: sendRequest, data: response } = useRequest();
+  const {
+    register,
+    handleSubmit,
+    formState: { errors: formErrors, isValid: formValid },
+  } = useForm<SubjectSchemaType>({
+    resolver: zodResolver(SubjectValidationSchema),
+    mode: 'onTouched',
+  });
 
-    const { data: lecturers, error } = useRequest(
-        `${settings.backendAPIUrl}lecturers`,
-        { method: 'GET' },
-    );
+  const navigate = useNavigate();
 
-    useEffect(() => {
-        if (error) {
-            alert(
-                'An error occurred while loading lecturers. Form submission unavailable.',
-            );
-            // todo: disable form
-            console.error(error);
-        }
-    }, [error]);
+  useEffect(() => {
+    if (addSubjectResult === BasicRequestResult.Error) {
+      showNotification({
+        color: 'red',
+        title: 'An error occurred',
+        message: 'Unknown error occurred, check provided data and try again or contact administrator.',
+      });
+    } else if (addSubjectResult === BasicRequestResult.Ok) {
+      showNotification({
+        color: 'green',
+        title: 'New subject added',
+        message: '',
+      });
+    }
+  }, [addSubjectResult]);
 
-    const [lecturerSelectorOptions, setLecturerSelectorOptions] = useState<
-        [string, string][]
-    >([]);
+  useAsyncEffect(async () => {
+    if (addSubjectResult === BasicRequestResult.Ok) {
+      await sleep(500);
+      navigate(`${settings.browserBaseURL}/administration/subjects-list`);
+    }
+  }, [addSubjectResult]);
 
-    useEffect(() => {
-        if (lecturers) {
-            setLecturerSelectorOptions(
-                (lecturers as Lecturer[]).map((e) => [
-                    e.lecturerId.toString(),
-                    `${e.firstName} ${e.lastName}`,
-                ]),
-            );
-        }
-    }, [lecturers]);
+  return (
+    <Card withBorder shadow="md" maw={800} my={20} mx="auto">
+      <Group gap={20} p={10} display="flex" style={{ flexDirection: 'column', alignItems: 'start' }}>
+        <Text component="h2" size="lg">
+          Add new subject
+        </Text>
 
-    useEffect(() => {
-        if (lecturerSelectorOptions.length > 0) {
-            setLecturerId(lecturerSelectorOptions[0][0]);
-        }
-    }, [lecturerSelectorOptions])
-
-    const submit = () => {
-        sendRequest(`${settings.backendAPIUrl}subjects`, {
-            method: 'POST',
-            mode: 'cors',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                name,
-                lecturerId,
-            }),
-        });
-    };
-
-    useEffect(() => {
-        console.log('response changed');
-    }, [response]);
-
-    return (
-        <form>
-            <TextInput value={name} updateValue={setName} label="Name" />
-            <BasicSelector
-              values={lecturerSelectorOptions}
-              value={lecturerId}
-              updateValue={setLecturerId}
-              label="Lecturer"
-            />
-
-            <input
-              onClick={jsSubmit(submit)}
-              type="submit"
-              value="Proceed and close"
-            />
-        </form>
-    );
+        <Group maw={700}>
+          <SubjectForm
+            register={register}
+            errors={formErrors}
+            submit={handleSubmit(addSubject)}
+            loading={addSubjectResult === BasicRequestResult.Loading}
+            disableSubmit={[BasicRequestResult.Loading, BasicRequestResult.Ok].includes(addSubjectResult) || !formValid}
+          />
+        </Group>
+      </Group>
+    </Card>
+  );
 };
 
 export { AddNewSubjectPage };

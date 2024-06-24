@@ -1,135 +1,110 @@
 import { FC, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { TextInput } from '../forms/TextInput';
-import { jsSubmit } from '../../utils/js-submit';
-import { CheckboxSelector } from '../forms/CheckboxSelector';
-import { useRequest } from '../../hooks/useRequest.hook';
+import { Blockquote, Card, Flex, Group, Loader, Space, Text } from '@mantine/core';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { Subject } from '../../model/existing-objects/Subject';
+import { LecturerForm } from '../LecturerForm';
+import { useGetSubjects } from '../../hooks/useGetSubjects.hook';
+import { SubpageError } from '../SubpageError';
+import { useAddLecturer } from '../../hooks/useAddLecturer.hook';
+import { BasicRequestResult } from '../../types/BasicRequestResult';
+import { showNotification } from '../../utils/Notifications';
+import { useAsyncEffect } from '../../hooks/useAsyncEffect.hook';
+import { sleep } from '../../utils/sleep';
+import { LecturerSchemaType, LecturerValidationSchema } from '../../validation-schemas/lecturer';
 import { settings } from '../../settings';
 
 const AddNewLecturerPage: FC = () => {
-    const [firstName, setFirstName] = useState<string>('');
-    const [lastName, setLastName] = useState<string>('');
-    const [email, setEmail] = useState<string>('');
-    const [subjectIds, setSubjectIds] = useState<string[]>([]);
+  const {
+    register,
+    handleSubmit,
+    formState: { errors: formErrors, isValid: formValid },
+  } = useForm<LecturerSchemaType>({
+    resolver: zodResolver(LecturerValidationSchema),
+    mode: 'onTouched',
+  });
 
-    const [formEnabled, setFormEnabled] = useState(false); // false because list of subjects needs to be loaded
+  const [subjectIds, setSubjectIds] = useState<string[]>([]);
 
-    const { send: sendRequest, data: response, ...request } = useRequest();
+  const { subjects, error: getSubjectsError } = useGetSubjects();
 
-    const { data: subjects, error } = useRequest(
-        `${settings.backendAPIUrl}subjects`,
-        { method: 'GET' },
-    );
+  const { proceed: addLecturer, result: addLecturerResult } = useAddLecturer();
 
-    // todo: fix duplicated request to lecturers list via GET
+  const navigate = useNavigate();
 
-    useEffect(() => {
-        if (error) {
-            alert(
-                'An error occurred while loading list of subjects. Subject selection function unavailable and form is disabled. Reload if needed.',
-            );
-            console.error(error);
-        }
-    }, [error]);
+  const submit = async (data: LecturerSchemaType) => {
+    await addLecturer({
+      ...data,
+      subjectIds: subjectIds.map((id) => Number.parseInt(id, 10)),
+    });
+  };
 
-    const submit = () => {
-        setFormEnabled(false);
-        sendRequest(`${settings.backendAPIUrl}lecturers`, {
-            method: 'POST',
-            mode: 'cors',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                firstName,
-                lastName,
-                email,
-                subjectIds: subjectIds.map((id) => parseInt(id, 10)),
-                surveys: [],
-            }),
-        });
-    };
+  useEffect(() => {
+    if (addLecturerResult === BasicRequestResult.Error) {
+      showNotification({
+        color: 'red',
+        title: 'An error occurred',
+        message: 'Unknown error occurred, check provided data and try again or contact administrator.',
+      });
+    } else if (addLecturerResult === BasicRequestResult.Ok) {
+      showNotification({
+        color: 'green',
+        title: 'New lecturer added',
+        message: 'Lecturer has been added to system and students can now rank him/her.',
+      });
+    }
+  }, [addLecturerResult]);
 
-    useEffect(() => {
-        if (request.error) {
-            window.alert('An error occurred!'); // TODO: add proper handling
-            console.error(request.error);
-            setFormEnabled(true);
-        }
-    }, [request.error]);
+  useAsyncEffect(async () => {
+    if (addLecturerResult === BasicRequestResult.Ok) {
+      await sleep(500);
+      navigate(`${settings.browserBaseURL}/administration/lecturers-list`);
+    }
+  }, [addLecturerResult]);
 
-    const navigate = useNavigate();
+  if (getSubjectsError) {
+    return <SubpageError text="Error while loading subject list. Contact administrator." />;
+  }
 
-    useEffect(() => {
-        if (
-            typeof response === 'object' &&
-            response !== null &&
-            Object.hasOwn(response, 'lecturerId')
-        ) {
-            navigate('/administration/lecturers-list');
-        }
-    }, [response]);
-
-    const [subjectsCheckboxData, setSubjectsCheckboxData] = useState<
-        [string, string][]
-    >([]);
-
-    useEffect(() => {
-        if (subjects) {
-            setSubjectsCheckboxData(
-                (subjects as Subject[]).map((subject) => [
-                    subject.subjectId.toString(),
-                    subject.name,
-                ]),
-            );
-            setFormEnabled(true);
-        }
-    }, [subjects]);
-
+  if (subjects === null) {
     return (
-        <>
-            <h1>Add new Lecturer</h1>
-            <p>
-                Adding new lecturer will cause new set of questions within new
-                survey to be created for this lecturer. This is automatic and
-                cannot be disabled.
-            </p>
-            <form>
-                <TextInput
-                  value={firstName}
-                  updateValue={setFirstName}
-                  label="Name"
-                />
-                <TextInput
-                  value={lastName}
-                  updateValue={setLastName}
-                  label="Surname"
-                />
-                <TextInput
-                  value={email}
-                  updateValue={setEmail}
-                  label="E-mail"
-                />
-
-                <CheckboxSelector
-                  values={subjectsCheckboxData}
-                  selectedValues={subjectIds}
-                  updateValue={setSubjectIds}
-                  label="Subjects"
-                />
-
-                {!formEnabled && <p>Processing</p>}
-
-                <input
-                  disabled={!formEnabled}
-                  onClick={jsSubmit(submit)}
-                  type="submit"
-                  value="Proceed and close"
-                />
-            </form>
-        </>
+      <Flex mih={200} w="100%" align="center" direction="column" justify="center">
+        <Loader size="lg" />
+        <Space h={20} />
+        <Text>Loading subject list</Text>
+      </Flex>
     );
+  }
+
+  return (
+    <Card withBorder shadow="md" maw={800} my={20} mx="auto">
+      <Group gap={20} p={10}>
+        <Text component="h2" size="lg">
+          Add new Lecturer
+        </Text>
+        <Blockquote p={10}>
+          <Text size="xs">
+            Adding new lecturer will cause new set of questions within new survey to be created for this lecturer. This
+            is automatic and cannot be disabled.
+          </Text>
+        </Blockquote>
+
+        <Group maw={700}>
+          <LecturerForm
+            register={register}
+            errors={formErrors}
+            setSubjectIds={setSubjectIds}
+            subjectIds={subjectIds}
+            submit={handleSubmit(submit)}
+            subjects={subjects as Subject[]}
+            loading={addLecturerResult === BasicRequestResult.Loading}
+            disableSubmit={[BasicRequestResult.Ok, BasicRequestResult.Loading].includes(addLecturerResult)}
+          />
+        </Group>
+      </Group>
+    </Card>
+  );
 };
 
 export { AddNewLecturerPage };

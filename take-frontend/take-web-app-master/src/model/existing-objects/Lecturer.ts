@@ -1,10 +1,13 @@
-interface Lecturer {
-    lecturerId: number;
-    firstName: string;
-    lastName: string;
-    email: string;
-    subjects: string[];
-    surveys: string[];
+interface LecturerData {
+  lecturerId: number;
+  firstName: string;
+  lastName: string;
+  email: string;
 }
 
-export type { Lecturer };
+interface Lecturer extends LecturerData {
+  subjects: string[];
+  surveys: string[];
+}
+
+export type { LecturerData, Lecturer };

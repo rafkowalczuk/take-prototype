@@ -1,62 +1,54 @@
-import { FC, useEffect, useState } from 'react';
+import { FC } from 'react';
+import { Link } from 'react-router-dom';
+import { Button, Card, Divider, Flex, Group, Loader, Text } from '@mantine/core';
 import { Subject } from '../../model/existing-objects/Subject';
-import { useRequest } from '../../hooks/useRequest.hook';
+import { SubpageError } from '../SubpageError';
+import { useGetSubjects } from '../../hooks/useGetSubjects.hook';
+import { SubpageLoader } from '../SubpageLoader';
 import { settings } from '../../settings';
 
 const SubjectsListPage: FC = () => {
-    const [subjects, setSubjects] = useState<Subject[]>([]);
+  const { subjects, error } = useGetSubjects();
 
-    const { data, processing, error } = useRequest(
-        `${settings.backendAPIUrl}subjects`,
-        { method: 'GET' },
-    );
+  if (error) {
+    return <SubpageError text="An error occurred while loading list" />;
+  }
 
-    // todo: fix duplicated request to lecturers list via GET
+  if (subjects === null) {
+    return <SubpageLoader />;
+  }
 
-    useEffect(() => {
-        if (error) {
-            alert('An error occurred.');
-            console.error(error);
-        }
-    }, [error]);
+  return (
+    <Flex direction="column" px={10} py={20} maw={1200} mx="auto">
+      <Flex justify="space-between" align="center">
+        <Text component="h2" size="xl">
+          Subjects
+        </Text>
 
-    useEffect(() => {
-        if (data) {
-            setSubjects(data as Subject[]);
-        }
-    }, [data]);
+        <Button component={Link} to={`${settings.browserBaseURL}/administration/add-new-subject`}>
+          Add new
+        </Button>
+      </Flex>
 
-    return (
-        <>
-            <h1>Subjects list</h1>
-            <p>
-                List contains data about all subjects - name and lecturer who
-                directs it.
-            </p>
-            {processing && <p>Loading</p>}
-            {!processing && (
-                <table>
-                    <thead>
-                        <tr>
-                            <td>Subject name</td>
-                            <td>Lecturer</td>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {subjects.map((subject) => (
-                            <tr key={subject.subjectId}>
-                                <td>{subject.name}</td>
-                                <td>
-                                    {subject.lecturer.firstName}{' '}
-                                    {subject.lecturer.lastName}
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            )}
-        </>
-    );
+      <Divider my={10} />
+
+      <Group gap={10}>
+        {subjects.length === 0 && <SubpageError text="No subjects" />}
+
+        {(subjects as Subject[]).map((subject) => (
+          <Card w="100%" shadow="sm" withBorder key={subject.id}>
+            <Flex justify="space-between" align="center">
+              <Text>{subject.name}</Text>
+
+              <Button component={Link} to={`${settings.browserBaseURL}/administration/subject-data/${subject.id}`}>
+                Show {'>'}
+              </Button>
+            </Flex>
+          </Card>
+        ))}
+      </Group>
+    </Flex>
+  );
 };
 
 export { SubjectsListPage };

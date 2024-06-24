@@ -1,8 +1,14 @@
+import { StudentSurveyListResponse } from './Survey';
+
 interface Student {
-    studentId: number;
-    firstName: string;
-    lastName: string;
-    email: string;
+  studentId: number;
+  firstName: string;
+  lastName: string;
+  email: string;
 }
 
-export type { Student };
+interface StudentWithSurveys extends Student {
+  surveys: StudentSurveyListResponse;
+}
+
+export type { Student, StudentWithSurveys };

@@ -1,8 +1,8 @@
 # Use an official Node.js image as the base
-FROM node:22.2.0-alpine3.20
+FROM node:22.2.0-alpine3.20 AS build
 
 # Set the working directory inside the container
-WORKDIR /usr/src/app
+WORKDIR /app
 
 # Copy package.json and package-lock.json to the container
 COPY package*.json ./
@@ -17,4 +17,14 @@ COPY . .
 #RUN npm run build
 
 # Specify the command to run when the container starts
-CMD ["npm", "run", "start:watch"]
+RUN npm run build
+
+
+
+# Host files
+
+FROM nginx:1.27-alpine
+
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+COPY --from=build /app/build/ /usr/share/nginx/html/

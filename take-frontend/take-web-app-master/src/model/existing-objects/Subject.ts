@@ -1,9 +1,12 @@
-import { Lecturer } from './Lecturer';
-
 interface Subject {
-    subjectId: number;
-    name: string;
-    lecturer: Lecturer;
+  id: number;
+  name: string;
 }
 
-export type { Subject };
+interface SubjectWithLecturers {
+  subjectId: number;
+  name: string;
+  lecturersNames: string[];
+}
+
+export type { Subject, SubjectWithLecturers };

@@ -1,26 +1,31 @@
-import { useEffect, useState } from 'react';
-import { Lecturer } from '../model/existing-objects/Lecturer';
-import { useRequest } from './useRequest.hook';
-import { settings } from '../settings';
+import { useState } from 'react';
+import { request } from '../utils/request';
+import { useAsyncEffect } from './useAsyncEffect.hook';
+import { LecturerData } from '../model/existing-objects/Lecturer';
 
 const useGetLecturers = () => {
-    const request = useRequest(`${settings.backendAPIUrl}lecturers`, {
-        method: 'GET',
-        mode: 'cors',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-    });
+  const [lecturers, setLecturers] = useState<LecturerData[] | null>(null);
+  const [error, setError] = useState<unknown>(null);
 
-    const [lecturers, _setLecturers] = useState<Lecturer[]>([]);
+  useAsyncEffect(async () => {
+    const response = await request.get('/lecturers');
 
-    useEffect(() => {
-        if (!request.processing && !request.error && request.data) {
-            _setLecturers(request.data as Lecturer[]);
-        }
-    }, [request.processing]);
+    if (response.status === 200) {
+      setLecturers(response.data);
+    } else {
+      setError(true);
+    }
+  }, []);
 
-    return { lecturers, processing: request.processing, error: request.error };
+  const updateList = (newList: LecturerData[]) => {
+    setLecturers(newList);
+  };
+
+  return {
+    lecturers,
+    error,
+    updateList,
+  };
 };
 
 export { useGetLecturers };
